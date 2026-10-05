@@ -1,0 +1,1 @@
+# shtrudel_team_brand-manager
