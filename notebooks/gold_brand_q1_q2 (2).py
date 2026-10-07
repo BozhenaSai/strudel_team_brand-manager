@@ -10,19 +10,26 @@
 
 # COMMAND ----------
 
-spark.sql("CREATE SCHEMA IF NOT EXISTS workspace.brand_gold")
+# MAGIC %run ./00_config
 
 # COMMAND ----------
 
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
-SOURCE = "workspace.brand_silver"
-TARGET = "workspace.brand_gold"
+SOURCE = f"{TARGET_CATALOG}.{SILVER_SCHEMA}"
+TARGET = f"{TARGET_CATALOG}.{GOLD_SCHEMA}"
 BRAND = "Brand#32"
 
 lineitem = spark.table(f"{SOURCE}.lineitem")
-part = spark.table(f"{SOURCE}.part")
+part = (
+    spark.table(f"{SOURCE}.part")
+    .join(
+        spark.table(f"{SOURCE}.brand"),
+        on="p_brand",
+        how="inner",
+    )
+)
 orders = spark.table(f"{SOURCE}.orders")
 partsupp = spark.table(f"{SOURCE}.partsupp")
 
