@@ -1,4 +1,116 @@
 # shtrudel_team_brand-manager
+## Presentation
+https://canva.link/edikligoom29wzo
+## Overview
+
+This homework builds a Bronze → Silver → Gold Lakehouse for the
+TPC-H Brand Manager profile using Databricks and Delta tables.
+
+The source is `samples.tpch`. The solution answers four business
+questions about brand revenue, market share, product margins and
+sale-price deviations.
+
+## Repository structure
+
+- `notebooks/`: configuration, ingestion, validation and Gold analysis.
+- `docs/`: Silver ER diagram, dashboard screenshots and presentation.
+- `pyproject.toml` and `uv.lock`: homework configuration and dependency lock.
+- `README.md`: setup, metric definitions, design decisions and results.
+
+## Local setup
+
+Clone the repository and run:
+
+    uv sync
+
+The notebooks run in Databricks because they use the workspace-provided
+Spark session and Unity Catalog tables. `uv sync` prepares the local
+Python project; it does not execute the Databricks pipeline.
+
+## Configuration
+
+All processing notebooks load `00_config` using `%run ./00_config`.
+
+| Parameter | Default |
+|---|---|
+| SOURCE_CATALOG | samples |
+| SOURCE_SCHEMA | tpch |
+| TARGET_CATALOG | workspace |
+| BRONZE_SCHEMA | brand_bronze |
+| SILVER_SCHEMA | brand_silver |
+| GOLD_SCHEMA | brand_gold |
+
+To use another target catalog or schema, update these values before
+running the pipeline.
+
+The execution identity must have access to the source and permission
+to create schemas and tables in the target catalog. Access grants are
+managed separately from the processing notebooks.
+
+## How to run
+
+Import or open the repository notebooks in Databricks, keeping them
+in the same notebook folder so relative `%run` paths resolve.
+
+Run the notebooks in this order:
+
+1. `01_bronze`
+2. `02_silver`
+3. `gold_brand_q1_q2 (2)`
+4. `gold_brand_q3_q4`
+
+Each notebook loads `00_config` automatically.
+
+The Databricks Job `brand_manager_pipeline` should use the same task
+order. Q3–Q4 depends on Q1–Q2 because it reads the Gold table
+`brand_revenue`.
+
+## Bronze ingestion
+
+Bronze copies all eight TPC-H tables without changing source columns
+or values:
+
+`customer`, `lineitem`, `nation`, `orders`, `part`, `partsupp`,
+`region` and `supplier`.
+
+Three metadata columns are added:
+
+| Column | Meaning |
+|---|---|
+| `_loaded_at` | Timestamp of the ingestion write |
+| `_source_table` | Fully qualified source table name |
+| `_run_id` | Identifier shared by all tables in one Bronze run |
+
+Bronze uses Delta tables and full overwrite on each run.
+
+## Validation across layers
+
+Validation is included in the processing notebooks.
+
+- Source → Bronze: row counts match for all eight tables.
+- Source → Bronze: order totals, extended prices and net revenue match.
+- Bronze → Silver: Bronze rows equal Silver rows plus quarantined rows.
+- Bronze → Silver: monetary totals include the amounts in quarantine.
+- Silver → Gold: total net revenue matches `sum(brand_revenue.revenue)`.
+- Silver → Gold: line-item count matches `sum(brand_revenue.line_items)`.
+- Supplier joins use both part and supplier keys to prevent duplication.
+
+Gold is aggregated, so its physical row count is not expected to equal
+the Silver row count. We reconcile the number of represented line items
+and the revenue instead.
+
+Assertions stop notebook execution when these checks fail.
+
+## Refresh strategy
+
+This homework uses full batch refreshes rather than incremental ingestion.
+
+Bronze and Gold tables are overwritten. Silver tables and quarantine
+are dropped and rebuilt in dependency order, with constraints recreated.
+
+Rebuilding Silver removes its previous table history and quarantine
+contents. The notebooks are intended to run sequentially.
+
 
 # Silver 
 
