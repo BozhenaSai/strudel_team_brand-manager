@@ -213,3 +213,105 @@ All checks use `assert`, so the notebook fails if any of them stops being true. 
 |---|---|---|---|
 | `sum(l_extendedprice * (1 - l_discount))` | 1089835179247.2155 | 1089835179247.2155 | 1089835179247.22 (printed with 2 decimals) |
 | line items | 29,999,795 | 29,999,795 | 29,999,795 (`sum(line_items)`) |
+
+
+# Gold: Q3 and Q4 (market share stability and product price analysis)
+
+Notebook: `notebooks/gold_brand_q3_q4` (runs after `03_gold_q1_q2`).
+Source schemas: `workspace.brand_silver` and `workspace.brand_gold`.
+Target schema: `workspace.brand_gold`.
+
+The notebook answers Brand Manager questions 3 and 4. It identifies the brands with the largest sales share within their categories, analyzes the stability of the leading brand over time, and checks whether actual product sale prices differ from retail prices by more than 15%.
+
+It also creates Gold tables used for Brand Manager monitoring in a Databricks dashboard.
+
+### Definitions
+
+| Term | Definition |
+|---|---|
+| Category | Manufacturer (`p_mfgr`), consistent with Q1/Q2. |
+| Market share | Brand revenue divided by total revenue of its manufacturer/category for the same period. |
+| Actual unit sale price | Total net revenue for a product divided by total quantity sold: `sum(l_extendedprice * (1 - l_discount)) / sum(l_quantity)`. |
+| Price difference | Absolute percentage difference between the product's actual unit sale price and `p_retailprice`. |
+| Stability | Quarterly market-share variation measured using standard deviation and the range between minimum and maximum share. |
+
+### Gold tables
+
+| Table | Grain | Purpose |
+|---|---|---|
+| `brand_market_share` | manufacturer, brand, year, quarter | Stores quarterly brand revenue, category revenue and market share for Q3 and monitoring. |
+| `product_price_analysis` | product | Stores one row per product with actual unit sale price, retail price, quantity sold, line-item count and price difference percentage for Q4. |
+
+Both tables are overwritten on every run.
+
+### Q3: Largest market share and stability over time
+
+Market share is calculated within each manufacturer/category. The leading brand in each category is identified first.
+
+| Category | Leading brand | Share |
+|---|---|---:|
+| Manufacturer#1 | Brand#12 | 20.16% |
+| Manufacturer#2 | Brand#21 | 20.18% |
+| Manufacturer#3 | Brand#33 | 20.20% |
+| Manufacturer#4 | Brand#44 | 20.13% |
+| Manufacturer#5 | Brand#51 | 20.11% |
+
+The largest share among the category leaders belongs to **Brand#33 in Manufacturer#3**, with an overall category share of **20.20%**.
+
+Its quarterly market share is very stable:
+
+| Metric | Result |
+|---|---:|
+| Average quarterly share | 20.21% |
+| Standard deviation | 0.09 percentage points |
+| Minimum quarterly share | 20.00% |
+| Maximum quarterly share | 20.37% |
+| Range | 0.37 percentage points |
+
+Therefore, Brand#33 remains close to 20% of Manufacturer#3 sales throughout the observed period, with only small quarter-to-quarter variation.
+
+### Q4: Actual sale price vs. retail price
+
+The analysis is performed at the product level. For every product, the actual unit sale price is calculated as total net revenue divided by total quantity sold and compared with `p_retailprice`.
+
+| Metric | Result |
+|---|---:|
+| Minimum price difference | 1.77% |
+| Average price difference | 5.00% |
+| Maximum price difference | 8.42% |
+| Products with difference > 15% | 0 |
+
+No product has an actual unit sale price that differs from its retail price by more than **15%**.
+
+Because the number of affected products is **0**, there is no concentration of such cases within any particular brand or category.
+
+### Validation
+
+| Check | What it proves | Result |
+|---|---|---|
+| V1 | Brand market shares within every manufacturer and quarter sum to approximately 100% | Maximum deviation from 100% is 0.01 percentage points |
+| V2 | `product_price_analysis` has exactly one row per product and does not introduce duplicate product records | 1,000,000 rows and 1,000,000 unique products |
+
+The small V1 deviation is caused by rounding individual market shares to two decimal places.
+
+Both validation checks use `assert`, so the notebook fails if the expected consistency conditions are violated.
+
+### Brand Manager monitoring dashboard
+
+![brand_manager_dashboard.png](./brand_manager_dashboard.png "brand_manager_dashboard.png")
+
+A Databricks dashboard, **Brand Manager Monitoring**, was created using the Gold `brand_market_share` data.
+
+It contains two time-series visualizations:
+
+- **Revenue over time** — quarterly revenue by brand.
+- **Market share over time** — quarterly brand share within its category.
+
+The dashboard also provides filters for:
+
+- **Category** (`p_mfgr`)
+- **Brand** (`p_brand`)
+
+This allows the Brand Manager to monitor individual brands and categories over time. For example, filtering to `Manufacturer#3` and `Brand#33` shows the revenue and market-share dynamics of the leading brand identified in Q3.
+
+The dashboard is maintained separately in Databricks and is not embedded in the notebook.
