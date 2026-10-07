@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Databricks
+.databricks/
+.bundle/
+
+# macOS
+.DS_Store
+
+# Secrets
+*.pem
+*.token
